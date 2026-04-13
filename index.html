@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RoadmapHub — Seu gerenciador de projetos</title>
+  <meta name="description" content="Crie e gerencie roadmaps visuais para seus projetos de forma simples e bonita." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <span class="logo-icon">🗺</span>
+        <span class="logo-text">RoadmapHub</span>
+      </div>
+    </div>
+    <div class="sidebar-section-label">Projetos</div>
+    <ul class="project-list" id="projectList"></ul>
+    <button class="btn-add-project" id="btnAddProject">
+      <i data-lucide="plus"></i>
+      Novo Projeto
+    </button>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main" id="main">
+
+    <!-- EMPTY STATE -->
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🗺</div>
+      <h2>Nenhum projeto selecionado</h2>
+      <p>Crie um novo projeto ou selecione um existente na barra lateral para começar.</p>
+      <button class="btn-primary" id="btnAddProjectEmpty">
+        <i data-lucide="plus"></i>
+        Criar meu primeiro projeto
+      </button>
+    </div>
+
+    <!-- PROJECT VIEW -->
+    <div class="project-view" id="projectView" style="display:none">
+
+      <div class="project-header">
+        <div class="project-header-left">
+          <span class="project-emoji" id="viewEmoji"></span>
+          <div>
+            <h1 class="project-title" id="viewTitle"></h1>
+            <p class="project-subtitle" id="viewSubtitle"></p>
+          </div>
+        </div>
+        <div class="project-header-right">
+          <button class="btn-export" id="btnExport" title="Exportar como imagem">
+            <i data-lucide="image-down"></i>
+            Exportar
+          </button>
+          <button class="btn-icon" id="btnEditProject" title="Editar projeto">
+            <i data-lucide="pencil"></i>
+          </button>
+          <button class="btn-icon btn-danger" id="btnDeleteProject" title="Excluir projeto">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- GLOBAL PROGRESS -->
+      <div class="global-progress-card">
+        <div class="global-progress-header">
+          <span>Progresso geral</span>
+          <span class="global-progress-pct" id="globalPct">0%</span>
+        </div>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="globalBar" style="width:0%"></div>
+        </div>
+        <div class="progress-stats" id="progressStats">0 de 0 tarefas concluídas</div>
+      </div>
+
+      <!-- TIMELINE -->
+      <div class="timeline-wrapper" id="timelineWrapper">
+        <div class="timeline-line" id="timelineLine"></div>
+        <div class="timeline-dots" id="timelineDots"></div>
+      </div>
+
+      <!-- PHASES -->
+      <div class="phases-container" id="phasesContainer"></div>
+
+      <!-- ADD PHASE -->
+      <button class="btn-add-phase" id="btnAddPhase">
+        <i data-lucide="circle-plus"></i>
+        Adicionar Fase
+      </button>
+
+    </div>
+  </main>
+
+  <!-- TAG POPOVER -->
+  <div class="tag-popover" id="tagPopover" style="display:none">
+    <div class="tag-popover-header">Tags</div>
+    <div class="tag-popover-list" id="tagPopoverList"></div>
+    <div class="tag-popover-new">
+      <input type="text" id="tagPopoverInput" placeholder="Nova tag..." maxlength="20" />
+      <div class="tag-color-dots" id="tagPopoverColors"></div>
+      <button class="btn-add-task" id="btnCreateTagInline">+</button>
+    </div>
+  </div>
+
+  <!-- EXPORT OVERLAY -->
+  <div class="export-overlay" id="exportOverlay" style="display:none">
+    <div class="export-spinner">
+      <i data-lucide="loader-2" class="spin"></i>
+      <span>Gerando imagem...</span>
+    </div>
+  </div>
+
+  <!-- ======================================================
+       MODAL: PROJECT
+  ====================================================== -->
+  <div class="modal-overlay" id="modalProject" style="display:none">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3 id="modalProjectTitle">Novo Projeto</h3>
+        <button class="btn-icon" id="btnCloseModalProject"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Emoji</label>
+          <div class="emoji-picker" id="emojiPicker">
+            <span class="emoji-option selected" data-emoji="📐">📐</span>
+            <span class="emoji-option" data-emoji="📚">📚</span>
+            <span class="emoji-option" data-emoji="💻">💻</span>
+            <span class="emoji-option" data-emoji="🎨">🎨</span>
+            <span class="emoji-option" data-emoji="🏋️">🏋️</span>
+            <span class="emoji-option" data-emoji="🌍">🌍</span>
+            <span class="emoji-option" data-emoji="🎵">🎵</span>
+            <span class="emoji-option" data-emoji="🚀">🚀</span>
+            <span class="emoji-option" data-emoji="💡">💡</span>
+            <span class="emoji-option" data-emoji="🔬">🔬</span>
+            <span class="emoji-option" data-emoji="📊">📊</span>
+            <span class="emoji-option" data-emoji="🎯">🎯</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="inputProjectName">Nome do Projeto</label>
+          <input type="text" id="inputProjectName" placeholder="Ex: Matemática, Inglês, React..." maxlength="40" />
+        </div>
+        <div class="form-group">
+          <label for="inputProjectDesc">Descrição (opcional)</label>
+          <input type="text" id="inputProjectDesc" placeholder="Uma breve descrição do projeto..." maxlength="80" />
+        </div>
+        <div class="form-group">
+          <label>Cor do projeto</label>
+          <div class="color-picker" id="colorPicker">
+            <span class="color-option selected" data-color="#6C63FF" style="background:#6C63FF"></span>
+            <span class="color-option" data-color="#00C9A7" style="background:#00C9A7"></span>
+            <span class="color-option" data-color="#FF6584" style="background:#FF6584"></span>
+            <span class="color-option" data-color="#F7B731" style="background:#F7B731"></span>
+            <span class="color-option" data-color="#45AAF2" style="background:#45AAF2"></span>
+            <span class="color-option" data-color="#FD9644" style="background:#FD9644"></span>
+            <span class="color-option" data-color="#A29BFE" style="background:#A29BFE"></span>
+            <span class="color-option" data-color="#26DE81" style="background:#26DE81"></span>
+          </div>
+        </div>
+        <!-- TAGS MANAGER -->
+        <div class="form-group">
+          <label>Tags do projeto</label>
+          <div class="tags-manager">
+            <div class="tags-current" id="tagsCurrentList"></div>
+            <div class="add-tag-inline">
+              <input type="text" id="inputNewTagModal" placeholder="Nome da tag..." maxlength="20" />
+              <div class="tag-color-dots" id="tagModalColors"></div>
+              <button class="btn-add-task" id="btnAddTagModal">Criar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btnCancelProject">Cancelar</button>
+        <button class="btn-primary" id="btnSaveProject">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================
+       MODAL: PHASE
+  ====================================================== -->
+  <div class="modal-overlay" id="modalPhase" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalPhaseTitle">Nova Fase</h3>
+        <button class="btn-icon" id="btnCloseModalPhase"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="inputPhaseName">Nome da Fase</label>
+          <input type="text" id="inputPhaseName" placeholder="Ex: Fase 1 — Álgebra Básica..." maxlength="60" />
+        </div>
+        <div class="form-group">
+          <label for="inputPhaseDesc">Descrição (opcional)</label>
+          <input type="text" id="inputPhaseDesc" placeholder="Objetivos desta fase..." maxlength="120" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="inputPhaseStart">Data de início</label>
+            <input type="date" id="inputPhaseStart" />
+          </div>
+          <div class="form-group">
+            <label for="inputPhaseEnd">Conclusão prevista</label>
+            <input type="date" id="inputPhaseEnd" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btnCancelPhase">Cancelar</button>
+        <button class="btn-primary" id="btnSavePhase">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================
+       MODAL: CONFIRM
+  ====================================================== -->
+  <div class="modal-overlay" id="modalConfirm" style="display:none">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="confirmTitle">Confirmar exclusão</h3>
+        <button class="btn-icon" id="btnCloseConfirm"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <p id="confirmMessage">Tem certeza que deseja excluir?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btnCancelConfirm">Cancelar</button>
+        <button class="btn-danger-solid" id="btnConfirmAction">Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
