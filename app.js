@@ -1,6 +1,14 @@
 'use strict';
 
 /* ============================================================
+   SUPABASE CONFIG
+   ============================================================ */
+const SUPABASE_URL = 'https://eafuorkonnumufkznohg.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhZnVvcmtvbm51bXVma3pub2hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMTE2NzksImV4cCI6MjA5MTY4NzY3OX0.17tVAYFv9GE9r-FyzkNe5VcSLR91bSVgjrrb1IM9-tQ';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ============================================================
    STATE
    ============================================================ */
 
@@ -9,57 +17,262 @@ let state = {
   activeProjectId: null
 };
 
-/* ============================================================
-   PERSISTENCE
-   ============================================================ */
-
-const uid = () => '_' + Math.random().toString(36).slice(2, 10);
-
-function save() {
-  localStorage.setItem('roadmaphub_v2', JSON.stringify(state));
-}
-
-function load() {
-  try {
-    // migrate from v1
-    const old = localStorage.getItem('roadmaphub_v1');
-    if (old && !localStorage.getItem('roadmaphub_v2')) {
-      const parsed = JSON.parse(old);
-      // add new fields
-      parsed.projects = (parsed.projects || []).map(p => ({
-        tags: [],
-        ...p,
-        phases: (p.phases || []).map(ph => ({
-          startDate: '', endDate: '', notes: '',
-          ...ph,
-          tasks: (ph.tasks || []).map(t => ({ tagIds: [], ...t }))
-        }))
-      }));
-      state = parsed;
-      save();
-      return;
-    }
-    const raw = localStorage.getItem('roadmaphub_v2');
-    if (raw) state = JSON.parse(raw);
-  } catch (_) { /* ignore */ }
-}
-
-function activeProject() {
-  return state.projects.find(p => p.id === state.activeProjectId) || null;
-}
+let currentUser = null;
+let currentDbRecordId = null; // The UUID of the row in the 'projects' table for this user
+let syncTimeout = null;
 
 /* ============================================================
-   BOOT
+   BOOT & AUTH
    ============================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {
-  load();
+  // Register Service Worker for PWA
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js').catch(err => console.log('SW falhou', err));
+  }
+
+  bindAuthEvents();
   bindStaticEvents();
-  render();
+
+  // Listen to auth changes
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      currentUser = session.user;
+      showApp(session.user);
+      loadFromSupabase();
+    } else {
+      currentUser = null;
+      showAuth();
+    }
+  });
+
+  // Check initial session
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session) {
+      currentUser = session.user;
+      showApp(session.user);
+      loadFromSupabase();
+    } else {
+      showAuth();
+    }
+  });
 });
 
 function initIcons() {
   setTimeout(() => window.lucide && window.lucide.createIcons(), 0);
+}
+
+/* ============================================================
+   AUTH LOGIC
+   ============================================================ */
+
+function bindAuthEvents() {
+  const tabLogin = document.getElementById('tabLogin');
+  const tabSignup = document.getElementById('tabSignup');
+  const confirmWrap = document.getElementById('authConfirmWrap');
+  const btnAuthSubmit = document.getElementById('btnAuthSubmit');
+  const btnAuthLabel = document.getElementById('btnAuthLabel');
+  const errorEl = document.getElementById('authError');
+
+  tabLogin.addEventListener('click', () => {
+    tabLogin.classList.add('active'); tabSignup.classList.remove('active');
+    confirmWrap.style.display = 'none';
+    btnAuthSubmit.dataset.mode = 'login';
+    btnAuthLabel.textContent = 'Entrar';
+    errorEl.textContent = '';
+  });
+
+  tabSignup.addEventListener('click', () => {
+    tabSignup.classList.add('active'); tabLogin.classList.remove('active');
+    confirmWrap.style.display = 'flex';
+    btnAuthSubmit.dataset.mode = 'signup';
+    btnAuthLabel.textContent = 'Criar conta';
+    errorEl.textContent = '';
+  });
+
+  btnAuthSubmit.addEventListener('click', async () => {
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    const mode = btnAuthSubmit.dataset.mode;
+    errorEl.textContent = '';
+
+    if (!email || !password) {
+      errorEl.textContent = 'Preencha todos os campos.';
+      return;
+    }
+
+    setAuthLoading(true);
+
+    if (mode === 'signup') {
+      const confirm = document.getElementById('authConfirm').value;
+      if (password !== confirm) {
+        errorEl.textContent = 'As senhas não coincidem.';
+        setAuthLoading(false);
+        return;
+      }
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) errorEl.textContent = error.message;
+      else if (data.user && !data.session) {
+        errorEl.textContent = 'Verifique seu e-mail para confirmar a conta.';
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) errorEl.textContent = 'Credenciais inválidas.';
+    }
+
+    setAuthLoading(false);
+  });
+
+  document.getElementById('btnSignOut').addEventListener('click', async () => {
+    await supabase.auth.signOut();
+  });
+}
+
+function setAuthLoading(isLoading) {
+  const btn = document.getElementById('btnAuthSubmit');
+  const loader = document.getElementById('authLoader');
+  btn.disabled = isLoading;
+  loader.style.display = isLoading ? 'block' : 'none';
+}
+
+function showAuth() {
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('appLayout').style.display = 'none';
+  initIcons();
+}
+
+function showApp(user) {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appLayout').style.display = 'flex';
+
+  const initial = user.email.charAt(0).toUpperCase();
+  document.getElementById('userAvatar').textContent = initial;
+  document.getElementById('userEmail').textContent = user.email;
+}
+
+/* ============================================================
+   DATA SYNC (SUPABASE <-> LOCAL)
+   ============================================================ */
+
+const uid = () => '_' + Math.random().toString(36).slice(2, 10);
+
+async function loadFromSupabase() {
+  showSyncStatus('Sincronizando...', false);
+  
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id, data')
+    .eq('user_id', currentUser.id)
+    .single();
+
+  if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
+    console.error('Erro ao buscar dados:', error);
+    showSyncStatus('Erro ao carregar', true);
+    return;
+  }
+
+  if (data) {
+    // Data exists in cloud
+    currentDbRecordId = data.id;
+    state = data.data;
+    if(!state.projects) state = { projects: [], activeProjectId: null };
+
+    // Update local cache
+    localStorage.setItem('roadmaphub_v3', JSON.stringify(state));
+  } else {
+    // New user in cloud. Try to migrate from localStorage.
+    let migrated = false;
+    try {
+      const localV2 = localStorage.getItem('roadmaphub_v2');
+      const localV3 = localStorage.getItem('roadmaphub_v3');
+      
+      if (localV3) {
+        state = JSON.parse(localV3);
+        migrated = true;
+      } else if (localV2) {
+        state = JSON.parse(localV2);
+        migrated = true;
+      }
+    } catch(e) {}
+
+    if (!state.projects) state = { projects: [], activeProjectId: null };
+    
+    // Save the initial state to cloud
+    const { data: insertData, error: insertError } = await supabase
+      .from('projects')
+      .insert({ user_id: currentUser.id, data: state })
+      .select('id')
+      .single();
+      
+    if (insertData) currentDbRecordId = insertData.id;
+    if (migrated) localStorage.setItem('roadmaphub_v3', JSON.stringify(state));
+  }
+
+  showSyncStatus('Sincronizado ✓', false);
+  setTimeout(() => document.getElementById('syncToast').style.display = 'none', 2000);
+  
+  render();
+}
+
+function save() {
+  // Always save locally immediately for fast UI
+  localStorage.setItem('roadmaphub_v3', JSON.stringify(state));
+  
+  // Debounce cloud sync
+  clearTimeout(syncTimeout);
+  showSyncStatus('Salvando...', false);
+  
+  syncTimeout = setTimeout(async () => {
+    if (!currentUser) return;
+    
+    let req;
+    if (currentDbRecordId) {
+      req = supabase.from('projects').update({ data: state, updated_at: new Date().toISOString() }).eq('id', currentDbRecordId);
+    } else {
+       // Should rarely happen if load works, but fallback
+      req = supabase.from('projects').insert({ user_id: currentUser.id, data: state }).select('id').single();
+    }
+
+    const { data, error } = await req;
+    if (error) {
+      console.error('Error saving to cloud', error);
+      showSyncStatus('Erro ao salvar', true);
+    } else {
+      if (data && data.id) currentDbRecordId = data.id;
+      showSyncStatus('Sincronizado ✓', false);
+      setTimeout(() => document.getElementById('syncToast').style.display = 'none', 2000);
+    }
+  }, 1000);
+}
+
+function showSyncStatus(msg, isError) {
+  const toast = document.getElementById('syncToast');
+  document.getElementById('syncToastMsg').textContent = msg;
+  toast.style.display = 'flex';
+  
+  const icon = toast.querySelector('i');
+  if (isError) {
+    icon.setAttribute('data-lucide', 'alert-circle');
+    icon.style.color = 'var(--danger)';
+  } else if (msg === 'Salvando...') {
+    icon.setAttribute('data-lucide', 'refresh-cw');
+    icon.classList.add('spin');
+    icon.style.color = 'var(--text-secondary)';
+  } else {
+    icon.setAttribute('data-lucide', 'cloud-check');
+    icon.classList.remove('spin');
+    icon.style.color = 'var(--success)';
+  }
+  
+  if (window.lucide) window.lucide.createIcons();
+  
+  document.getElementById('userSync').textContent = msg;
+  if(isError) document.getElementById('userSync').style.color = 'var(--danger)';
+  else document.getElementById('userSync').style.color = 'var(--success)';
+}
+
+function activeProject() {
+  return state.projects.find(p => p.id === state.activeProjectId) || null;
 }
 
 /* ============================================================
@@ -248,10 +461,10 @@ function renderPhases(proj) {
     });
 
     // Notes auto-save
-    let notesTimer;
+    let phaseNotesTimer;
     card.querySelector(`#notes-${ph.id}`).addEventListener('input', (e) => {
-      clearTimeout(notesTimer);
-      notesTimer = setTimeout(() => {
+      clearTimeout(phaseNotesTimer);
+      phaseNotesTimer = setTimeout(() => {
         const p = activeProject();
         const phase = p?.phases.find(x => x.id === ph.id);
         if (phase) { phase.notes = e.target.value; save(); renderSidebar(); }

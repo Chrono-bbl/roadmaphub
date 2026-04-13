@@ -5,99 +5,165 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RoadmapHub — Seu gerenciador de projetos</title>
   <meta name="description" content="Crie e gerencie roadmaps visuais para seus projetos de forma simples e bonita." />
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6C63FF" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="RoadmapHub" />
+  <link rel="apple-touch-icon" href="icon-512.png" />
+
+  <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- SIDEBAR -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <div class="logo">
-        <span class="logo-icon">🗺</span>
-        <span class="logo-text">RoadmapHub</span>
+  <!-- ======================================================
+       AUTH SCREEN
+  ====================================================== -->
+  <div class="auth-screen" id="authScreen">
+    <div class="auth-bg"></div>
+    <div class="auth-card">
+      <div class="auth-logo">🗺</div>
+      <h1 class="auth-title">RoadmapHub</h1>
+      <p class="auth-sub">Seus roadmaps em qualquer lugar, sempre sincronizados.</p>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabLogin" data-tab="login">Entrar</button>
+        <button class="auth-tab" id="tabSignup" data-tab="signup">Criar conta</button>
+      </div>
+
+      <div class="auth-form">
+        <div class="form-group">
+          <label for="authEmail">E-mail</label>
+          <input type="email" id="authEmail" placeholder="seu@email.com" autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label for="authPassword">Senha</label>
+          <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+        <div class="form-group" id="authConfirmWrap" style="display:none">
+          <label for="authConfirm">Confirmar senha</label>
+          <input type="password" id="authConfirm" placeholder="••••••••" autocomplete="new-password" />
+        </div>
+        <div class="auth-error" id="authError"></div>
+        <button class="btn-auth-submit" id="btnAuthSubmit" data-mode="login">
+          <span id="btnAuthLabel">Entrar</span>
+          <i data-lucide="loader-2" class="spin auth-loading" id="authLoader" style="display:none"></i>
+        </button>
       </div>
     </div>
-    <div class="sidebar-section-label">Projetos</div>
-    <ul class="project-list" id="projectList"></ul>
-    <button class="btn-add-project" id="btnAddProject">
-      <i data-lucide="plus"></i>
-      Novo Projeto
-    </button>
-  </aside>
+  </div>
 
-  <!-- MAIN -->
-  <main class="main" id="main">
+  <!-- ======================================================
+       APP LAYOUT
+  ====================================================== -->
+  <div class="app-layout" id="appLayout" style="display:none">
 
-    <!-- EMPTY STATE -->
-    <div class="empty-state" id="emptyState">
-      <div class="empty-icon">🗺</div>
-      <h2>Nenhum projeto selecionado</h2>
-      <p>Crie um novo projeto ou selecione um existente na barra lateral para começar.</p>
-      <button class="btn-primary" id="btnAddProjectEmpty">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <span class="logo-icon">🗺</span>
+          <span class="logo-text">RoadmapHub</span>
+        </div>
+      </div>
+
+      <div class="sidebar-section-label">Projetos</div>
+      <ul class="project-list" id="projectList"></ul>
+      <button class="btn-add-project" id="btnAddProject">
         <i data-lucide="plus"></i>
-        Criar meu primeiro projeto
+        Novo Projeto
       </button>
-    </div>
 
-    <!-- PROJECT VIEW -->
-    <div class="project-view" id="projectView" style="display:none">
+      <!-- USER INFO -->
+      <div class="sidebar-user" id="sidebarUser">
+        <div class="user-avatar" id="userAvatar"></div>
+        <div class="user-info">
+          <div class="user-email" id="userEmail"></div>
+          <div class="user-sync" id="userSync">Sincronizado ✓</div>
+        </div>
+        <button class="btn-icon" id="btnSignOut" title="Sair">
+          <i data-lucide="log-out"></i>
+        </button>
+      </div>
+    </aside>
 
-      <div class="project-header">
-        <div class="project-header-left">
-          <span class="project-emoji" id="viewEmoji"></span>
-          <div>
-            <h1 class="project-title" id="viewTitle"></h1>
-            <p class="project-subtitle" id="viewSubtitle"></p>
+    <!-- MAIN -->
+    <main class="main" id="main">
+
+      <!-- EMPTY STATE -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">🗺</div>
+        <h2>Nenhum projeto selecionado</h2>
+        <p>Crie um novo projeto ou selecione um existente na barra lateral para começar.</p>
+        <button class="btn-primary" id="btnAddProjectEmpty">
+          <i data-lucide="plus"></i>
+          Criar meu primeiro projeto
+        </button>
+      </div>
+
+      <!-- PROJECT VIEW -->
+      <div class="project-view" id="projectView" style="display:none">
+
+        <div class="project-header">
+          <div class="project-header-left">
+            <span class="project-emoji" id="viewEmoji"></span>
+            <div>
+              <h1 class="project-title" id="viewTitle"></h1>
+              <p class="project-subtitle" id="viewSubtitle"></p>
+            </div>
+          </div>
+          <div class="project-header-right">
+            <button class="btn-export" id="btnExport" title="Exportar como imagem">
+              <i data-lucide="image-down"></i>
+              Exportar
+            </button>
+            <button class="btn-icon" id="btnEditProject" title="Editar projeto">
+              <i data-lucide="pencil"></i>
+            </button>
+            <button class="btn-icon btn-danger" id="btnDeleteProject" title="Excluir projeto">
+              <i data-lucide="trash-2"></i>
+            </button>
           </div>
         </div>
-        <div class="project-header-right">
-          <button class="btn-export" id="btnExport" title="Exportar como imagem">
-            <i data-lucide="image-down"></i>
-            Exportar
-          </button>
-          <button class="btn-icon" id="btnEditProject" title="Editar projeto">
-            <i data-lucide="pencil"></i>
-          </button>
-          <button class="btn-icon btn-danger" id="btnDeleteProject" title="Excluir projeto">
-            <i data-lucide="trash-2"></i>
-          </button>
+
+        <div class="global-progress-card">
+          <div class="global-progress-header">
+            <span>Progresso geral</span>
+            <span class="global-progress-pct" id="globalPct">0%</span>
+          </div>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="globalBar" style="width:0%"></div>
+          </div>
+          <div class="progress-stats" id="progressStats">0 de 0 tarefas concluídas</div>
         </div>
-      </div>
 
-      <!-- GLOBAL PROGRESS -->
-      <div class="global-progress-card">
-        <div class="global-progress-header">
-          <span>Progresso geral</span>
-          <span class="global-progress-pct" id="globalPct">0%</span>
+        <div class="timeline-wrapper" id="timelineWrapper">
+          <div class="timeline-line"></div>
+          <div class="timeline-dots" id="timelineDots"></div>
         </div>
-        <div class="progress-bar-track">
-          <div class="progress-bar-fill" id="globalBar" style="width:0%"></div>
-        </div>
-        <div class="progress-stats" id="progressStats">0 de 0 tarefas concluídas</div>
+
+        <div class="phases-container" id="phasesContainer"></div>
+
+        <button class="btn-add-phase" id="btnAddPhase">
+          <i data-lucide="circle-plus"></i>
+          Adicionar Fase
+        </button>
+
       </div>
-
-      <!-- TIMELINE -->
-      <div class="timeline-wrapper" id="timelineWrapper">
-        <div class="timeline-line" id="timelineLine"></div>
-        <div class="timeline-dots" id="timelineDots"></div>
-      </div>
-
-      <!-- PHASES -->
-      <div class="phases-container" id="phasesContainer"></div>
-
-      <!-- ADD PHASE -->
-      <button class="btn-add-phase" id="btnAddPhase">
-        <i data-lucide="circle-plus"></i>
-        Adicionar Fase
-      </button>
-
-    </div>
-  </main>
+    </main>
+  </div>
 
   <!-- TAG POPOVER -->
   <div class="tag-popover" id="tagPopover" style="display:none">
@@ -116,6 +182,12 @@
       <i data-lucide="loader-2" class="spin"></i>
       <span>Gerando imagem...</span>
     </div>
+  </div>
+
+  <!-- SYNC INDICATOR -->
+  <div class="sync-toast" id="syncToast" style="display:none">
+    <i data-lucide="cloud" style="width:14px;height:14px"></i>
+    <span id="syncToastMsg">Salvando...</span>
   </div>
 
   <!-- ======================================================
@@ -166,7 +238,6 @@
             <span class="color-option" data-color="#26DE81" style="background:#26DE81"></span>
           </div>
         </div>
-        <!-- TAGS MANAGER -->
         <div class="form-group">
           <label>Tags do projeto</label>
           <div class="tags-manager">
