@@ -181,7 +181,7 @@ const uid = () => '_' + Math.random().toString(36).slice(2, 10);
 async function loadFromSupabase() {
   showSyncStatus('Sincronizando...', false);
   
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('projects')
     .select('id, data')
     .eq('user_id', currentUser.id)
@@ -220,7 +220,7 @@ async function loadFromSupabase() {
     if (!state.projects) state = { projects: [], activeProjectId: null };
     
     // Save the initial state to cloud
-    const { data: insertData, error: insertError } = await supabase
+    const { data: insertData, error: insertError } = await db
       .from('projects')
       .insert({ user_id: currentUser.id, data: state })
       .select('id')
