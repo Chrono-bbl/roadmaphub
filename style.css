@@ -121,8 +121,9 @@ html, body {
   border-radius: 3px; cursor: pointer; transition: all var(--transition);
 }
 .auth-tab.active {
-  background: var(--bg-card); color: var(--text-primary);
-  box-shadow: var(--shadow-sm);
+  background: var(--accent);
+  color: #080808;
+  font-weight: 700;
 }
 
 .auth-form { display: flex; flex-direction: column; gap: 14px; text-align: left; }
