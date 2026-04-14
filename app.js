@@ -110,14 +110,35 @@ function bindAuthEvents() {
         setAuthLoading(false);
         return;
       }
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) errorEl.textContent = error.message;
-      else if (data.user && !data.session) {
-        errorEl.textContent = 'Verifique seu e-mail para confirmar a conta.';
+      try {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) {
+          if (error.message.includes('User already registered')) errorEl.textContent = 'Este e-mail já está em uso.';
+          else if (error.message.includes('Password should be at least')) errorEl.textContent = 'A senha deve ter pelo menos 6 caracteres.';
+          else errorEl.textContent = error.message;
+        } else if (data.user && !data.session) {
+          errorEl.textContent = 'Conta criada! Verifique seu e-mail para confirmar.';
+          // Opcional: voltar para a aba entrar automaticamente para facilitar
+          document.getElementById('tabLogin').click();
+        }
+      } catch (err) {
+        errorEl.textContent = 'Erro ao criar conta: ' + err.message;
       }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) errorEl.textContent = 'Credenciais inválidas.';
+      try {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          if (error.message.includes('Email not confirmed')) {
+            errorEl.textContent = 'Confirme sua conta clicando no link enviado ao seu e-mail.';
+          } else if (error.message.includes('Invalid login credentials')) {
+            errorEl.textContent = 'E-mail ou senha incorretos.';
+          } else {
+            errorEl.textContent = error.message;
+          }
+        }
+      } catch (err) {
+        errorEl.textContent = 'Erro ao entrar: ' + err.message;
+      }
     }
 
     setAuthLoading(false);
