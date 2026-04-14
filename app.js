@@ -6,7 +6,7 @@
 const SUPABASE_URL = 'https://eafuorkonnumufkznohg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhZnVvcmtvbm51bXVma3pub2hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMTE2NzksImV4cCI6MjA5MTY4NzY3OX0.17tVAYFv9GE9r-FyzkNe5VcSLR91bSVgjrrb1IM9-tQ';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ============================================================
    STATE
@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindStaticEvents();
 
   // Listen to auth changes
-  supabase.auth.onAuthStateChange((event, session) => {
+  db.auth.onAuthStateChange((event, session) => {
     if (session) {
       currentUser = session.user;
       showApp(session.user);
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Check initial session
-  supabase.auth.getSession().then(({ data: { session } }) => {
+  db.auth.getSession().then(({ data: { session } }) => {
     if (session) {
       currentUser = session.user;
       showApp(session.user);
@@ -111,7 +111,7 @@ function bindAuthEvents() {
         return;
       }
       try {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await db.auth.signUp({ email, password });
         if (error) {
           if (error.message.includes('User already registered')) errorEl.textContent = 'Este e-mail já está em uso.';
           else if (error.message.includes('Password should be at least')) errorEl.textContent = 'A senha deve ter pelo menos 6 caracteres.';
@@ -127,7 +127,7 @@ function bindAuthEvents() {
       }
     } else {
       try {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await db.auth.signInWithPassword({ email, password });
         if (error) {
           if (error.message.includes('Email not confirmed')) {
             errorEl.textContent = 'Confirme sua conta clicando no link enviado ao seu e-mail.';
@@ -146,7 +146,7 @@ function bindAuthEvents() {
   });
 
   document.getElementById('btnSignOut').addEventListener('click', async () => {
-    await supabase.auth.signOut();
+    await db.auth.signOut();
   });
 }
 
@@ -249,10 +249,10 @@ function save() {
     
     let req;
     if (currentDbRecordId) {
-      req = supabase.from('projects').update({ data: state, updated_at: new Date().toISOString() }).eq('id', currentDbRecordId);
+      req = db.from('projects').update({ data: state, updated_at: new Date().toISOString() }).eq('id', currentDbRecordId);
     } else {
        // Should rarely happen if load works, but fallback
-      req = supabase.from('projects').insert({ user_id: currentUser.id, data: state }).select('id').single();
+      req = db.from('projects').insert({ user_id: currentUser.id, data: state }).select('id').single();
     }
 
     const { data, error } = await req;
