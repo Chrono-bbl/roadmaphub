@@ -272,7 +272,13 @@ function showSyncStatus(msg, isError) {
   document.getElementById('syncToastMsg').textContent = msg;
   toast.style.display = 'flex';
   
-  const icon = toast.querySelector('i');
+  // After Lucide.createIcons(), <i> is replaced by <svg> — re-create element if needed
+  let icon = toast.querySelector('i');
+  if (!icon) {
+    icon = document.createElement('i');
+    icon.style.cssText = 'width:14px;height:14px';
+    toast.prepend(icon);
+  }
   if (isError) {
     icon.setAttribute('data-lucide', 'alert-circle');
     icon.style.color = 'var(--danger)';
