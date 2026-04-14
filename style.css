@@ -163,6 +163,8 @@ html, body {
   transition: all var(--transition);
 }
 .auth-error:not(:empty) { padding: 8px 12px; border: 1px solid rgba(217,85,85,0.2); }
+/* success state (set via JS) */
+.auth-error[style*="--success"]:not(:empty) { background: rgba(68,201,122,0.08); border-color: rgba(68,201,122,0.2); }
 .auth-loading { width: 16px !important; height: 16px !important; }
 
 /* ============================================================

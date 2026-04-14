@@ -117,9 +117,10 @@ function bindAuthEvents() {
           else if (error.message.includes('Password should be at least')) errorEl.textContent = 'A senha deve ter pelo menos 6 caracteres.';
           else errorEl.textContent = error.message;
         } else if (data.user && !data.session) {
-          errorEl.textContent = 'Conta criada! Verifique seu e-mail para confirmar.';
-          // Opcional: voltar para a aba entrar automaticamente para facilitar
+          // Switch to login tab first (it clears errorEl), then set the message
           document.getElementById('tabLogin').click();
+          errorEl.textContent = '✓ Conta criada! Verifique seu e-mail para confirmar.';
+          errorEl.style.color = 'var(--success)';
         }
       } catch (err) {
         errorEl.textContent = 'Erro ao criar conta: ' + err.message;
